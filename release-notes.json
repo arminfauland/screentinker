@@ -14,6 +14,16 @@
   ],
   "releases": [
     {
+      "version": "2.6.2",
+      "date": "2026-10-13",
+      "notes": [
+        "Play reports now match the plays your displays recorded, including plays that ended late, plays sent in by displays that had been offline, and deleted displays. The first start after this update recounts past hours in the background, which can take around twenty minutes on a large install.",
+        "Self-hosted servers can let calendars, data sources, webhooks and sign-in reach addresses on your own network. Name the hosts in the OUTBOUND_ALLOW_HOSTS setting, or set OUTBOUND_ALLOW_PRIVATE on a single-user install.",
+        "Talk needs edit access to the display, the same as starting a session. Someone who can only view a workspace can no longer listen to or speak through a display.",
+        "On hosted ScreenTinker, AI features only connect to public internet addresses, checked at the moment of connecting."
+      ]
+    },
+    {
       "version": "2.6.1",
       "date": "2026-10-12",
       "notes": [
