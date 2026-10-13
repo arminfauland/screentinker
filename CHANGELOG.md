@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.6.2
+
+A server-only fix release on the 2.6 line. It still runs on Node 20, so it can be installed before a
+host moves to Node 22. No player changed.
+
+### Fixed
+
+- **Talk media routes need write access** (#597). Publishing into, and listening to, a device's Talk
+  session, and publishing a workspace-wide broadcast, now need the same write access as starting a
+  session (`dashboard:talk-start`). Before, read access was enough. Reading the session info stays open
+  to members.
+- **Hosted AI requests are checked at connect time** (#597). On hosted instances every AI request
+  (chat, models, image generation, ComfyUI) goes through one transport. It vets the address it
+  actually connects to, so a hostname that resolves to a private, loopback or link-local address is
+  refused even after DNS. It does not follow redirects. This now includes the image URL an
+  OpenAI-compatible endpoint returns, and the save-time endpoint check now also refuses bracketed and
+  IPv4-mapped IPv6 literals. OIDC discovery, JWKS and token requests use the same connect-time check.
+  Self-hosted instances are unchanged, so local and LAN AI servers keep working.
+- **Proof-of-play reports stay in step with the raw plays** (#612). The hourly rollup computed each
+  hour once, when the hour ended, but plays are closed later, offline backlogs arrive with past times,
+  and device deletes remove their rows. On a copy of a production database the rollup had drifted in
+  31 workspaces: seconds were up to 40% short, and deleted devices were still counted. Later changes
+  to an already-rolled hour now mark it for recomputation from raw, and the retention prune deletes
+  whole hours and is never mistaken for such a change.
+  - **One-time repair on first boot:** it recomputes every hour that still has raw rows, in short
+    passes on the maintenance sweep. On a production-sized copy that was 2,142 hours in about 22
+    minutes, with the slowest pass at 59 ms.
+  - Once it has finished, `scripts/verify-play-rollup.js` should report OK. It is then safe to lower
+    `PLAY_LOG_RETENTION_DAYS`.
+
 ## 2.6.1
 
 A fix release for 2.6.0, found while filming its release video. Server only: no player changed.
