@@ -5,6 +5,19 @@
 A server-only fix release on the 2.6 line. It still runs on Node 20, so it can be installed before a
 host moves to Node 22. No player changed.
 
+### Added
+
+- **Self-hosted instances can open private addresses for outbound requests** (#618, reported by
+  @davidsrrh). A calendar or data source on the LAN was refused with "The address is not allowed",
+  with no way to allow it. The same guard covers webhooks, OIDC, Canva, embedded renders, the media
+  proxy, plugin egress and hosted AI. Two settings, both off unless set:
+  - **`OUTBOUND_ALLOW_HOSTS`** takes names (exact or `*.suffix`), IPs and CIDRs.
+  - **`OUTBOUND_ALLOW_PRIVATE=true`** opens every private-network range at once, for single-tenant
+    installs.
+
+  Cloud metadata addresses stay blocked whatever is set. On a self-hosted instance the "not allowed"
+  message now names the settings. See `docs/outbound-requests.md`.
+
 ### Fixed
 
 - **Talk media routes need write access** (#597). Publishing into, and listening to, a device's Talk
