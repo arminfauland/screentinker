@@ -2101,6 +2101,20 @@ if (VIEWER_MODE) {
         connect(config.serverUrl);
       };
       document.body.appendChild(tapOverlay);
+      if (autoplayAudioRequested()) {
+        setTimeout(() => {
+          if (!tapOverlay.parentNode) return;
+          probeUnmutedAutoplay().then((allowed) => {
+            if (!tapOverlay.parentNode) return;
+            if (allowed) {
+              console.log("[autoplay_audio] sound allowed \u2014 starting without a tap");
+              tapOverlay.onclick();
+            } else {
+              console.warn("[autoplay_audio] sound refused by this browser \u2014 staying on the muted path");
+            }
+          });
+        }, 0);
+      }
       setTimeout(() => {
         if (tapOverlay.parentNode) {
           tapOverlay.remove();
@@ -2115,6 +2129,45 @@ if (VIEWER_MODE) {
 }
 const savedUrl = config.serverUrl || window.location.origin;
 document.getElementById("serverUrl").value = savedUrl;
+function autoplayAudioRequested() {
+  try {
+    return new URLSearchParams(location.search).get("autoplay_audio") === "1";
+  } catch (e) {
+    return false;
+  }
+}
+function probeUnmutedAutoplay() {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok) => {
+      if (!done) {
+        done = true;
+        resolve(ok);
+      }
+    };
+    setTimeout(() => finish(false), 2e3);
+    try {
+      const a = document.createElement("audio");
+      a.src = "data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YcgAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
+      a.muted = false;
+      const p = a.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          a.pause();
+          finish(true);
+        }, () => finish(false));
+      } else {
+        setTimeout(() => {
+          const ok = !a.paused;
+          a.pause();
+          finish(ok);
+        }, 100);
+      }
+    } catch (e) {
+      finish(false);
+    }
+  });
+}
 function unlockAudio() {
   userHasInteracted = true;
   try {

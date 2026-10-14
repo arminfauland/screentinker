@@ -2461,6 +2461,37 @@
         };
         document.body.appendChild(tapOverlay);
 
+        /*
+         * #627: `?autoplay_audio=1` — opt-in for kiosk browsers that allow sound without a gesture
+         * (Fully Kiosk Browser with "Autoplay Audio" on, other WebView shells that lift the
+         * restriction). The player then takes the tap itself, so an unattended screen starts with
+         * sound after every reboot instead of waiting for someone to walk up.
+         *
+         * ⚠️ DEFERRED, AND THE DEFERRAL IS THE POINT. This runs in the middle of the boot script.
+         * The tap handler calls connect(), which reaches `let` bindings declared further down the
+         * file; called synchronously from here it hit them in their temporal dead zone, threw a
+         * ReferenceError, and the player never connected (seen on a real device). setTimeout(…, 0)
+         * runs it after the script has finished. Guarded by player-autoplay-audio-param.test.js.
+         *
+         * ⚠️ ASK FIRST, THEN UNMUTE. If the browser refuses sound anyway (wrong kiosk setting, an
+         * ordinary browser), nothing here happens: the overlay stays, a person can still tap, and
+         * the 5-second auto-dismiss below connects muted exactly as without the parameter.
+         */
+        if (autoplayAudioRequested()) {
+          setTimeout(() => {
+            if (!tapOverlay.parentNode) return;               // someone already tapped
+            probeUnmutedAutoplay().then((allowed) => {
+              if (!tapOverlay.parentNode) return;             // tapped or auto-dismissed meanwhile
+              if (allowed) {
+                console.log('[autoplay_audio] sound allowed — starting without a tap');
+                tapOverlay.onclick();
+              } else {
+                console.warn('[autoplay_audio] sound refused by this browser — staying on the muted path');
+              }
+            });
+          }, 0);
+        }
+
         // Auto-dismiss after 5 seconds if no interaction (plays muted)
         setTimeout(() => {
           if (tapOverlay.parentNode) {
@@ -2480,6 +2511,36 @@
     const savedUrl = config.serverUrl || window.location.origin;
     document.getElementById('serverUrl').value = savedUrl;
 
+
+    // #627: did the page ask to start with sound? See the tap overlay in the boot section.
+    function autoplayAudioRequested() {
+      try { return new URLSearchParams(location.search).get('autoplay_audio') === '1'; } catch (e) { return false; }
+    }
+
+    /*
+     * #627: ask the browser whether it will play sound without a gesture, by starting a short
+     * silent clip unmuted. Resolves true only if playback really started; a refusal
+     * (NotAllowedError), a decode error or no answer within 2 s all resolve false, so the caller
+     * falls back to today's muted start. Never rejects.
+     */
+    function probeUnmutedAutoplay() {
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+        setTimeout(() => finish(false), 2000);
+        try {
+          const a = document.createElement('audio');
+          a.src = 'data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YcgAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+          a.muted = false;
+          const p = a.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => { a.pause(); finish(true); }, () => finish(false));
+          } else {
+            setTimeout(() => { const ok = !a.paused; a.pause(); finish(ok); }, 100);   // pre-promise play()
+          }
+        } catch (e) { finish(false); }
+      });
+    }
 
     // Unlock audio on any user interaction
     function unlockAudio() {
